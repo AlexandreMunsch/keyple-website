@@ -81,9 +81,9 @@ public class DemoPoAuthentication  {
 
     private static final Logger logger = LoggerFactory.getLogger(DemoPoAuthentication.class);
 
-    // PO Reader name  
+    // PO Reader name
     private final static String PO_READER_NAME = "XXX";
-    
+
     // SAM Reader name
     private final static String SAM_READER_NAME = "XXX";
 
@@ -100,15 +100,15 @@ public class DemoPoAuthentication  {
         logger.info("============================================================================");
         logger.info("=                  Get and Configure the PO & SAM Readers                  =");
         logger.info("============================================================================");
-        
+
         // Register the PcscPlugin with SeProxyService, get the corresponding generic ReaderPlugin
         ReaderPlugin readerPlugin = seProxyService.registerPlugin(new PcscPluginFactory());
 
-        // Get the PO reader 
+        // Get the PO reader
         SeReader poReader = readerPlugin.getReader(PO_READER_NAME);
 
         // Configure the PO reader parameters
-        ((PcscReader)poReader).setContactless(true);    
+        ((PcscReader)poReader).setContactless(true);
 
         // Get a SAM reader
         SeReader samReader = readerPlugin.getReader(SAM_READER_NAME);
@@ -128,19 +128,19 @@ public class DemoPoAuthentication  {
         samSelection.prepareSelection(new SamSelectionRequest(samSelector));
         CalypsoSam calypsoSam;
         if (samReader.isSePresent()) {
-        	SelectionsResult selectionsResult = samSelection.processExplicitSelection(samReader);
-        	if (selectionsResult.hasActiveSelection()) {
-        		calypsoSam = (CalypsoSam) selectionsResult.getActiveMatchingSe();
-        	} else {
-        		throw new IllegalStateException("SAM matching failed!");
-        	}
+            SelectionsResult selectionsResult = samSelection.processExplicitSelection(samReader);
+            if (selectionsResult.hasActiveSelection()) {
+                calypsoSam = (CalypsoSam) selectionsResult.getActiveMatchingSe();
+            } else {
+                throw new IllegalStateException("SAM matching failed!");
+            }
         } else {
-        	throw new IllegalStateException("No SAM is present in the reader " + samReader.getName());
+            throw new IllegalStateException("No SAM is present in the reader " + samReader.getName());
         }
-        
+
         // Associate the calypsoSam and the samReader to create the samResource
         SeResource<CalypsoSam> samResource = new SeResource<CalypsoSam>(samReader, calypsoSam);
-        
+
         // Prepare the security settings used during the Calypso transaction
         PoSecuritySettings poSecuritySettings = new PoSecuritySettings.PoSecuritySettingsBuilder(samResource).build();
 
@@ -149,14 +149,14 @@ public class DemoPoAuthentication  {
         logger.info("============================================================================");
 
         logger.info(
-        		"= PO Reader Name = {}", 
-        		poReader.getName());
+                "= PO Reader Name = {}",
+                poReader.getName());
         String samSerialNumber = ByteArrayUtil.toHex(samResource.getMatchingSe().getSerialNumber());
         logger.info(
-        		"= SAM Reader Name = {}, Serial Number = {}",
-        		samResource.getSeReader().getName(),
+                "= SAM Reader Name = {}, Serial Number = {}",
+                samResource.getSeReader().getName(),
                 samSerialNumber);
-        
+
         logger.info("============================================================================");
         logger.info("=                     Prepare the Calypso PO selection                     =");
         logger.info("============================================================================");
@@ -177,14 +177,14 @@ public class DemoPoAuthentication  {
                         .invalidatedPo(InvalidatedPo.REJECT) // to indicate if an invalidated PO should be accepted or not
                         .build());
 
-        // Add the selection case to the current selection 
+        // Add the selection case to the current selection
         // (we could have added other cases)
         seSelection.prepareSelection(poSelectionRequest);
 
         logger.info("============================================================================");
         logger.info("=                  Check if a PO is present in the reader                  =");
         logger.info("============================================================================");
-        
+
         if (poReader.isSePresent()) {
             logger.info("============================================================================");
             logger.info("=                    Start of the Calypso PO processing                    =");
@@ -194,13 +194,13 @@ public class DemoPoAuthentication  {
             logger.info("============================================================================");
 
             try {
-            	// Actual PO communication: operate through a single request the Calypso PO selection
-            	CalypsoPo calypsoPo =
+                // Actual PO communication: operate through a single request the Calypso PO selection
+                CalypsoPo calypsoPo =
                     (CalypsoPo) seSelection.processExplicitSelection(poReader).getActiveMatchingSe();
 
-            	logger.info("The selection of the PO has succeeded.");
+                logger.info("The selection of the PO has succeeded.");
 
-            	logger.info("============================================================================");
+                logger.info("============================================================================");
                 logger.info("=                            2nd PO exchange                               =");
                 logger.info("=                     Open a Calypso secure session                        =");
                 logger.info("=                  Reading of Environment file (SFI=07h)                   =");
@@ -208,38 +208,38 @@ public class DemoPoAuthentication  {
 
                 // Create a PoTransaction object to manage the Calypso transaction
                 PoTransaction poTransaction = new PoTransaction(
-                		new SeResource<CalypsoPo>(poReader, calypsoPo), 
-                		poSecuritySettings);
+                        new SeResource<CalypsoPo>(poReader, calypsoPo),
+                        poSecuritySettings);
 
                 // Read the Environment file at the Session Opening
                 // (we could have added other commands)
                 poTransaction.prepareReadRecordFile(
-                		SFI_Environment, // the sfi to select
-                		RECORD_NUMBER_1);
-                
+                        SFI_Environment, // the sfi to select
+                        RECORD_NUMBER_1);
+
                 // Open Session with the debit key
                 poTransaction.processOpening(PoTransaction.SessionSetting.AccessLevel.SESSION_LVL_DEBIT);
-                   
+
                 // Get the Environment data
                 ElementaryFile efEnvironment = calypsoPo.getFileBySfi(SFI_Environment);
-                
+
                 String environmentLog = ByteArrayUtil.toHex(efEnvironment.getData().getContent());
                 logger.info("File Environment log: {}", environmentLog);
-                
+
                 if (!calypsoPo.isDfRatified()) {
-                	logger.info("============= Previous Calypso Secure Session was not ratified =============");
+                    logger.info("============= Previous Calypso Secure Session was not ratified =============");
                 }
 
                 logger.info("============================================================================");
                 logger.info("=                            3th PO exchange                               =");
                 logger.info("=                     Close the Calypso secure session                     =");
                 logger.info("============================================================================");
-                
+
                 // To close the channel with the PO after the closing
                 poTransaction.prepareReleasePoChannel();
-                
+
                 // Close the Calypso Secure Session
-                // A ratification command will be sent (CONTACTLESS_MODE)         
+                // A ratification command will be sent (CONTACTLESS_MODE)
                 poTransaction.processClosing();
 
                 logger.info("============================================================================");
